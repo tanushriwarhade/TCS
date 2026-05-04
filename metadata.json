@@ -1,0 +1,6 @@
+{
+  "name": "ExamPro - Modern Online Examination System",
+  "description": "A professional full-stack examination platform with real-time proctoring, student dashboards, and a robust admin panel. Features include auto-save, tab-switch warnings, and multi-format question support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

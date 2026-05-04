@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user identity and roles",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "admin"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["uid", "email", "displayName", "role", "createdAt"]
+    },
+    "Exam": {
+      "title": "Examination",
+      "description": "Stores exam configuration",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "durationInMinutes": { "type": "number" },
+        "totalMarks": { "type": "number" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "durationInMinutes", "totalMarks", "active"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "Individual questions for an exam",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "type": { "type": "string", "enum": ["mcq-single", "mcq-multiple", "numeric"] },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "correctAnswers": { "type": "array", "items": { "type": "string" } },
+        "marks": { "type": "number" },
+        "negativeMarks": { "type": "number" }
+      },
+      "required": ["text", "type", "correctAnswers", "marks"]
+    },
+    "Submission": {
+      "title": "Exam Submission",
+      "description": "Records of exam attempts",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "examId": { "type": "string" },
+        "answers": { "type": "object" },
+        "score": { "type": "number" },
+        "status": { "type": "string", "enum": ["ongoing", "completed"] },
+        "startedAt": { "type": "number" },
+        "completedAt": { "type": "number" }
+      },
+      "required": ["userId", "examId", "status", "startedAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "exams/{examId}": {
+      "schema": "Exam",
+      "description": "Main exam details"
+    },
+    "exams/{examId}/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Exam questions"
+    },
+    "submissions/{submissionId}": {
+      "schema": "Submission",
+      "description": "Student exam attempts"
+    }
+  }
+}

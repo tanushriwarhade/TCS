@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { 
+      return isSignedIn() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; 
+    }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // --- VALIDATION HELPERS ---
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
+             data.keys().size() == 5 &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() < 256 &&
+             data.displayName is string && data.displayName.size() < 100 &&
+             data.role in ['student', 'admin'] &&
+             data.createdAt is number;
+    }
+
+    function isValidExam(data) {
+      return data.keys().hasAll(['title', 'description', 'durationInMinutes', 'totalMarks', 'active', 'createdAt']) &&
+             data.title is string && data.title.size() < 200 &&
+             data.durationInMinutes is number && data.durationInMinutes > 0 &&
+             data.totalMarks is number && data.totalMarks > 0 &&
+             data.active is bool;
+    }
+
+    function isValidSubmission(data) {
+      return data.keys().hasAll(['userId', 'examId', 'status', 'startedAt', 'answers']) &&
+             data.userId == request.auth.uid &&
+             isValidId(data.examId) &&
+             data.status in ['ongoing', 'completed'] &&
+             data.startedAt is number &&
+             data.answers is map;
+    }
+
+    // --- COLLECTION RULES ---
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+      allow update: if (isSignedIn() && request.auth.uid == userId && 
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName'])) ||
+                       isAdmin();
+    }
+
+    match /exams/{examId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() && isValidExam(incoming());
+      allow update: if isAdmin() && isValidExam(incoming());
+      allow delete: if isAdmin();
+
+      match /questions/{questionId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+      }
+    }
+
+    match /submissions/{submissionId} {
+      allow read: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      allow create: if isSignedIn() && 
+                    incoming().userId == request.auth.uid && 
+                    isValidSubmission(incoming());
+      
+      allow update: if isSignedIn() && (
+        // Admin can do anything
+        isAdmin() ||
+        // Student can update their own ongoing attempt
+        (
+          existing().userId == request.auth.uid && 
+          existing().status == 'ongoing' &&
+          isValidSubmission(incoming()) &&
+          (
+            // Action: Save Progress
+            (incoming().status == 'ongoing' && incoming().diff(existing()).affectedKeys().hasOnly(['answers', 'lastSaved'])) ||
+            // Action: Finalize
+            (incoming().status == 'completed' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'completedAt', 'score', 'answers', 'lastSaved']))
+          )
+        )
+      );
+    }
+  }
+}
